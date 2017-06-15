@@ -1,0 +1,209 @@
+<?php
+
+namespace common\widgets\timepicker;
+
+use yii\helpers\Html;
+use yii\helpers\Json;
+use yii\widgets\InputWidget;
+
+class TimePicker extends InputWidget
+{
+    /**
+     * @var array the options for the TimePicker JS plugin.
+     */
+    public $pluginOptions = [];
+
+    /**
+     * Display timeformat in input textbox.
+     */
+    public $timeFormat = 'short';
+    /**
+     * @var string the input value.
+     * This value will be converted using `asTime()`
+     * with the [[dateFormat]] if it is not null.
+     */
+    public $value;
+
+    public $data = [];
+
+    /**
+     * Initializes the widget.
+     */
+    public function init()
+    {
+        parent::init();
+    }
+
+    /**
+     * @inheritdoc
+     */
+    public function run()
+    {
+        // get formatted time value
+        if ($this->hasModel()) {
+            $value = Html::getAttributeValue($this->model, $this->attribute);
+        } else {
+            $value = $this->value;
+        }
+
+        if ($value !== null && $value !== '') {
+            // format value according to timeFormat
+            try {
+                $value = asTime($value, $this->timeFormat);
+            } catch (InvalidParamException $e) {
+                // ignore exception and keep original value if it is not a valid time
+            }
+        }
+        $defaultOptions = [
+            'time24Hours' => false,
+            'showSeconds' => false,
+            'minuteSteps' => 1,
+            'class' => 'form-control',
+        ];
+        $options = array_merge($defaultOptions, $this->pluginOptions);
+        //dump($options['class']);
+        $this->options['value'] = $value;
+        if ($this->hasModel()) {
+            // .form-inline div
+            $html = '<div class="form-inline">';
+
+            // Hours Select
+            $html .= '<select class="' . $options['class'] . ' ' . $this->attribute . '-hourselect">';
+            $start = $options['time24Hours'] ? 0 : 1;
+            $end = $options['time24Hours'] ? 23 : 12;
+            for ($hours = $start; $hours <= $end; $hours++) {
+                $hours = ($hours < 10 ? '0' . $hours : $hours);
+                $html .= '<option value="' . $hours . '">' . $hours . '</option>';
+            }
+            $html .= '</select>';
+
+            // Minute Select
+            $html .= '&nbsp; : &nbsp;<select class="' . $options['class'] . ' ' . $this->attribute . '-minuteselect">';
+            for ($minute = 0; $minute < 60; $minute += $options['minuteSteps']) {
+                $minute = ($minute < 10 ? '0' . $minute : $minute);
+                $html .= '<option value="' . $minute . '">' . $minute . '</option>';
+            }
+            $html .= '</select>';
+
+            // Second Select
+            if ($options['showSeconds']) {
+                $html .= '&nbsp; : &nbsp;<select class="' . $options['class'] . ' ' . $this->attribute . '-secondselect">';
+                for ($seconds = 0; $seconds < 60; $seconds++) {
+                    $seconds = ($seconds < 10 ? '0' . $seconds : $seconds);
+                    $html .= '<option value="' . $seconds . '">' . $seconds . '</option>';
+                }
+                $html .= '</select> ';
+            }
+
+            // AM/PM Select if time 12 Hours
+            if (!$options['time24Hours']) {
+                $html .= '&nbsp; : &nbsp;<select class="' . $options['class'] . ' ' . $this->attribute . '-ampmselect">';
+                $amHtml = '';
+                $pmHtml = '';
+
+                // if (selected.hour() >= 12) {
+                //     html += '<option value="AM"' + am_html + '>AM</option><option value="PM" selected="selected"' + pm_html + '>PM</option>';
+                // } else {
+                    $html .= '
+                        <option value="AM" selected="selected"' . $amHtml . '>AM</option>
+                        <option value="PM"' . $pmHtml . '>PM</option>';
+                // }
+
+                $html .= '</select>';
+            }
+            $html .= '</div>'; // end div .form-inline
+
+            echo $html;
+            //echo Html::activeDropDownList('hours', null, $this->getHours(), $this->options);
+            //echo Html::activeDropDownList('minute', null, $this->getMinute(), $this->options);
+            echo Html::activeHiddenInput($this->model, $this->attribute, $this->options);
+        } else {
+            echo Html::textInput($this->name, $this->value, $this->options);
+        }
+        //$this->registerPlugin();
+    }
+
+    /**
+     * Registers MultiSelect Bootstrap plugin and the related events
+     */
+    protected function registerPlugin()
+    {
+        //$view = $this->getView();
+        //TimePickerAsset::register($view);
+
+        $id = $this->options['id'];
+
+        $defaultOptions = [
+            'timeFormat' => 'H:i:s',
+            'disableTextInput' => true,
+            'showDuration' => true,
+            'step' => 30,
+            'useSelect' => false,
+        ];
+        $options = Json::encode(array_merge($defaultOptions, $this->pluginOptions));
+    }
+}
+
+
+
+------------------------------------
+
+
+<?php
+
+use yii\helpers\Html;
+use yii\widgets\ActiveForm;
+use common\widgets\timepicker\TimePicker;
+
+/* @var $this yii\web\View */
+/* @var $model backend\modules\timetable\models\ClassTimingDetail */
+/* @var $form yii\widgets\ActiveForm */
+?>
+
+<?php $form = ActiveForm::begin(['id' => 'classtimingdetail-form']); ?>
+
+<div class="row">
+	<div class="col-sm-6">
+		<?= $form->field($model, 'name')->textInput(['maxlength' => true]) ?>
+	</div>
+	<div class="col-sm-6">
+		<?= $form->field($model, 'class_timing_id')->textInput() ?>
+	</div>
+	<div class="col-sm-6">
+        <?= $form->field($model, 'start_time')->widget(TimePicker::classname(), [
+                'options' => [
+                    'class' => 'form-control',
+                    //'data-time-format' => 'H:i A',
+                ],
+                'pluginOptions' => [
+                    'time24Hours' => true,
+                    'showSeconds' => true,
+                    'minuteSteps' => 5,
+                    'class' => 'form-control',
+                ],
+            ]); ?>
+	</div>
+	<div class="col-sm-6">
+        <?= $form->field($model, 'end_time')->widget(TimePicker::classname(), [
+                'options' => [
+                    'class' => 'form-control',
+                    //'data-time-format' => 'H:i A',
+                ],
+            ]); ?>
+	</div>
+	<div class="col-sm-6">
+		<?= $form->field($model, 'break')->textInput() ?>
+	</div>
+</div>
+<div class="form-group">
+    <?= Html::submitButton($model->isNewRecord ? 'Create' : 'Update', ['class' => $model->isNewRecord ? 'btn btn-success' : 'btn btn-primary']) ?>
+    <?= Html::a('Cancel', ['index'], ['class' => 'btn btn-secondary']) ?>
+</div>
+
+<?php ActiveForm::end(); ?>
+
+
+
+
+
+
